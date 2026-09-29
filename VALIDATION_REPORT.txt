@@ -1,0 +1,36 @@
+Junba AI Transcriber v2.3 — 驗證報告
+=====================================
+日期：2026-09-29
+
+本次針對使用者回報：
+UnicodeEncodeError: 'ascii' codec can't encode character '\u56db' ...
+
+判定：
+- 錯誤中的 U+56DB 是中文字「四」。
+- v2.2 切割檔名保留原始中文檔名，例如「20260917_(四)_..._chunk_000.m4a」。
+- Gemini Files API 的 Python SDK / multipart HTTP 路徑在該 Windows 環境對上傳 filename 做 ASCII 編碼，請求尚未正式送到模型前就失敗。
+- 因此不是「Gemini 不能使用」，而是 v2.2 的上傳檔名相容性 Bug。
+
+v2.3 修正：
+1. Gemini 上傳前建立 ASCII-only 暫存別名，原始音檔、切割檔與輸出檔仍可保留中文。
+2. 上傳完成後刪除本機暫存別名；API 呼叫完成後盡力刪除 Google Files API 暫存檔。
+3. 切割改為辨識前的獨立前置階段；先切完，再載入 Whisper / 上傳 Gemini。
+4. 切割結果保存到可見的「輸出位置\切割音檔」，可供其他辨識軟體使用。
+5. 相同來源與切割設定可重用既有 chunks，不再重切。
+6. API Key 測試升級成實際建立短 WAV → Files API 上傳 → gemini-3.5-transcribe 呼叫。
+
+本機自動測試：
+- python -m compileall：通過。
+- pytest：4 passed。
+  a. FFmpeg duration + merge
+  b. 中文檔名切割 + manifest reuse
+  c. 中文檔名 → ASCII upload alias
+  d. Fake Gemini provider 確認上傳實際收到 ASCII basename，並完成回傳解析
+
+未在本環境執行的項目：
+- 真實 Google Gemini API 網路請求：未持有使用者 API Key，不應代替使用者呼叫。
+- Windows/CUDA 實機：由 GitHub Actions windows-latest 建置與 --self-test 驗證；CUDA 最終仍需在使用者 NVIDIA 驅動環境確認。
+
+結論：
+- v2.2 畫面中的 UnicodeEncodeError 原因已在程式碼層修正並加入回歸測試。
+- Gemini 3.5 Transcribe 本身支援音訊檔案轉錄；程式仍需使用者自己的有效 API Key 完成線上端到端測試。
